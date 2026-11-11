@@ -4,7 +4,7 @@ A modular, high-performance Roblox script suite powered by the **Linoria UI Libr
 
 Window Title format:
 ```text
-Vinser Hub (Pottasium - version-a2fb906f52d742d233c1) builderman123 / zlive
+Vinser Hub (OpiumwareMac - version-8f24f27be348bcb79070)
 ```
 
 ---

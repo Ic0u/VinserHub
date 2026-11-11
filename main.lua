@@ -414,18 +414,16 @@ end
 
 local CurrentExecutor = GetExecutorName()
 local CurrentGitVersion = GetGitVersion()
-local CurrentChannel = GetRobloxChannel()
-local CurrentUsername = GetUsername()
 
--- Format: Vinser Hub (Pottasium - version-a2fb906f52d742d233c1) builderman123 / zlive
-local WINDOW_TITLE = string.format("Vinser Hub (%s - version-%s) %s / %s", CurrentExecutor, CurrentGitVersion, CurrentUsername, CurrentChannel)
+-- Format: Vinser Hub (executor - version-gitCommit) stripped down player name & channel to prevent overflow
+local WINDOW_TITLE = string.format("Vinser Hub (%s - version-%s)", CurrentExecutor, CurrentGitVersion)
 
 -- Create Window
 local Window = Library:CreateWindow({
     Title = WINDOW_TITLE,
     Center = true,
     AutoShow = true,
-    TabPadding = 8,
+    TabPadding = 5,
     MenuFadeTime = 0.2
 })
 
@@ -1812,7 +1810,7 @@ task.spawn(function()
                 pcall(function() ping = math.floor(LocalPlayer:GetNetworkPing() * 1000) end)
             end
 
-            Library:SetWatermark(string.format("Vinser Hub (%s) | %s / %s | %d FPS | %d ms", CurrentExecutor, CurrentUsername, CurrentChannel, fps, ping))
+            Library:SetWatermark(string.format("Vinser Hub (%s) | %d FPS | %d ms", CurrentExecutor, fps, ping))
 
             if PingLabel then PingLabel:SetText(string.format("Ping: %d ms", ping)) end
             if FPSLabel then FPSLabel:SetText(string.format("FPS: %d", fps)) end
