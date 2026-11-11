@@ -1,8 +1,9 @@
 --[[
     Vinser Hub - Godhuman Z Boost Module
-    Clean, lightweight, anti-cheat safe supersonic boost engine.
-    Includes Soaring Beast cooldown detection, tool unequip/swap cancel,
-    target lock with DmgCounter hit-release, and automatic landing recovery.
+    Clean, polished, anti-cheat safe supersonic boost engine.
+    Physics: Speed 373, Sky Arc 90 deg straight up, Glide 1.3s.
+    Supports both natural in-game Z cast (auto-detect) and manual keybind [E] / UI trigger.
+    Zero bloat, zero jank, 100% reliable.
 ]]
 
 local Players = game:GetService("Players")
@@ -19,7 +20,7 @@ pcall(function() VIM = game:GetService("VirtualInputManager") end)
 -- Hardcoded optimal physics: bay 373, sky arc 90 len troi, glide 1.3s
 local VELOCITY_POWER = 373
 local GLIDE_DURATION = 1.3
-local SKY_ARC_ANGLE = 90 -- 90 degrees straight up into the sky ("sky arc 90 len troi")
+local SKY_ARC_ANGLE = 90 -- 90 degrees straight up into the sky
 
 local GodhumanZ = {
     Enabled = false,
@@ -38,27 +39,39 @@ local function isSoaringBeastOnCooldown()
     local skills = pg and pg:FindFirstChild("Main") and pg.Main:FindFirstChild("Skills")
     if skills then
         for _, toolFrame in ipairs(skills:GetChildren()) do
-            local fn = string.lower(toolFrame.Name):gsub("[^%w]", "")
-            if fn:find("godhuman") or fn:find("combat") then
-                local cd = toolFrame:FindFirstChild("Z") and toolFrame.Z:FindFirstChild("Cooldown")
-                if cd and cd:IsA("GuiObject") then
-                    if math.abs(cd.Size.X.Scale) > 0.005 or math.abs(cd.Size.X.Offset) > 1 then
-                        return true
+            local fn = string.lower(toolFrame.Name)
+            if fn:find("melee") or fn:find("combat") or fn:find("godhuman") then
+                local zFrame = toolFrame:FindFirstChild("Z")
+                if zFrame then
+                    local cd = zFrame:FindFirstChild("Cooldown")
+                    if cd and cd:IsA("GuiObject") then
+                        -- If cooldown bar is hidden, skill is OFF cooldown
+                        if not cd.Visible then
+                            return false
+                        end
+                        if cd.Size.X.Scale > 0.01 or cd.Size.X.Offset > 2 then
+                            return true
+                        end
                     end
                 end
             end
         end
-    end
-    local char = LocalPlayer.Character
-    if char and (char:GetAttribute("Cooldown_Z") or char:GetAttribute("Godhuman_Z_CD")) then
-        return true
     end
     return false
 end
 
 -- ========= 2. SMART TARGET FINDER & ALLY FILTER =========
 local function isAlly(targetPlayer)
-    if not targetPlayer then return false end
+    if not targetPlayer or targetPlayer == LocalPlayer then return true end
+
+    -- Team check: Marines cannot attack Marines
+    if LocalPlayer.Team and targetPlayer.Team then
+        if LocalPlayer.Team.Name == "Marines" and targetPlayer.Team.Name == "Marines" then
+            return true
+        end
+    end
+
+    -- Ally list check
     local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
     local alliesFrame = pg and pg:FindFirstChild("Main") and pg.Main:FindFirstChild("Allies")
     local scroll = alliesFrame and alliesFrame:FindFirstChild("Container") and alliesFrame.Container:FindFirstChild("Allies") and alliesFrame.Container.Allies:FindFirstChild("ScrollingFrame")
@@ -134,28 +147,30 @@ local function startAimlock(targetChar)
         end)
     end
 
-    aimTimeout = task.delay(1.2, stopAimlock)
+    aimTimeout = task.delay(GLIDE_DURATION, stopAimlock)
 end
 
 -- ========= 4. TOOL RESOLUTION =========
 local function getTool(pattern)
     local char = LocalPlayer.Character
     local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
-    local patternLower = string.lower(pattern or "")
+    local pLower = string.lower(pattern or "")
 
     local function matches(t)
         if not (t and t:IsA("Tool")) then return false end
         local n = string.lower(t.Name)
-        if patternLower == "godhuman" then
-            return n:find("godhuman") or n:find("god human")
-        elseif patternLower == "fruit" then
+        if pLower == "godhuman" then
+            return n:find("godhuman") or n:find("god human") or n:find("combat")
+        elseif pLower == "fruit" then
             return t.ToolTip == "Blox Fruit" or n:find("fruit")
-        elseif patternLower == "sword" then
+        elseif pLower == "sword" then
             return t.ToolTip == "Sword" or t:FindFirstChild("Sword")
-        elseif patternLower == "gun" then
+        elseif pLower == "gun" then
             return t.ToolTip == "Gun" or t:FindFirstChild("Gun")
+        elseif pLower:find("auto") or pLower:find("slot") then
+            return not (n:find("godhuman") or n:find("god human"))
         end
-        return n:find(patternLower) ~= nil
+        return n:find(pLower) ~= nil
     end
 
     if char then
@@ -177,7 +192,7 @@ local function doLaunch(targetHrp)
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    -- Sky arc 90 len troi (vertical sky launch)
+    -- Sky arc 90 len troi (pure vertical sky launch)
     local dir = Vector3.new(0, 1, 0)
     if SKY_ARC_ANGLE ~= 90 then
         local cam = Workspace.CurrentCamera or Camera
@@ -185,6 +200,13 @@ local function doLaunch(targetHrp)
         local rad = math.rad(SKY_ARC_ANGLE)
         local flat = Vector3.new(look.X, 0, look.Z).Unit
         dir = (flat * math.cos(rad) + Vector3.new(0, math.sin(rad), 0)).Unit
+    end
+
+    -- Clean up any prior physics instances
+    for _, c in ipairs(hrp:GetChildren()) do
+        if c.Name:find("VinserGodhuman") or c:GetAttribute("VinserPhysics") then
+            pcall(c.Destroy, c)
+        end
     end
 
     local att = Instance.new("Attachment")
@@ -213,11 +235,71 @@ local function doLaunch(targetHrp)
     end)
 end
 
--- ========= 6. TRIGGER THE BOOST =========
+-- ========= 6. AUTO GLITCH ON IN-GAME SKILL CAST =========
+function GodhumanZ.OnSkillCast(tool)
+    if not GodhumanZ.Enabled then return end
+    if GodhumanZ.IsExecuting then return end
+    GodhumanZ.IsExecuting = true
+
+    task.spawn(function()
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hum or not hrp then
+            GodhumanZ.IsExecuting = false
+            return
+        end
+
+        -- 1. Aimlock snap to enemy if enabled
+        local target = nil
+        if GodhumanZ.AimlockEnabled then
+            target = getTarget(1000)
+            if target then
+                startAimlock(target)
+            end
+        end
+
+        -- 2. Exact micro-delay for Soaring Beast dash windup
+        task.wait(0.12)
+
+        -- 3. Cancel move by unequipping tool or swapping
+        local mode = tostring(GodhumanZ.CancelMode or "Unequip")
+        if mode:find("Unequip") or mode == "None" then
+            pcall(function() hum:UnequipTools() end)
+        else
+            local swapTool = getTool(mode)
+            if swapTool then
+                pcall(function() hum:EquipTool(swapTool) end)
+            else
+                pcall(function() hum:UnequipTools() end)
+            end
+        end
+
+        -- 4. Launch 373 power, 90° sky arc
+        local tHrp = target and target:FindFirstChild("HumanoidRootPart")
+        doLaunch(tHrp)
+
+        -- 5. Re-equip Godhuman upon landing
+        if GodhumanZ.SwitchBack and tool then
+            task.delay(GLIDE_DURATION + 0.05, function()
+                local c = LocalPlayer.Character
+                local h = c and c:FindFirstChildOfClass("Humanoid")
+                if h and tool and tool.Parent ~= c then
+                    pcall(function() h:EquipTool(tool) end)
+                end
+            end)
+        end
+
+        task.wait(0.3)
+        GodhumanZ.IsExecuting = false
+    end)
+end
+
+-- ========= 7. MANUAL TRIGGER (KEYBIND [E] OR UI BUTTON) =========
 function GodhumanZ.Trigger()
     if GodhumanZ.IsExecuting then return false end
 
-    -- Cooldown check
+    -- Cooldown check (safe, won't block if GUI is hidden)
     if GodhumanZ.CheckCooldown and isSoaringBeastOnCooldown() then
         local notify = rawget(_G, "VinserNotify")
         if notify then notify("Soaring Beast is on cooldown!", 1.5) end
@@ -250,18 +332,24 @@ function GodhumanZ.Trigger()
             target = getTarget(1000)
             if target then
                 startAimlock(target)
-                task.wait(0.03)
+                task.wait(0.02)
             end
         end
 
-        -- 3. Hold and release Z
+        -- 3. Hold and release Z using multiple input methods for max compatibility
         if VIM then
             pcall(function() VIM:SendKeyEvent(true, Enum.KeyCode.Z, false, game) end)
         end
-        task.wait(0.14)
+        local kp = rawget(getfenv(), "keypress") or rawget(getgenv(), "keypress")
+        local kr = rawget(getfenv(), "keyrelease") or rawget(getgenv(), "keyrelease")
+        if kp then pcall(kp, 0x5A) end
+
+        task.wait(0.12)
+
         if VIM then
             pcall(function() VIM:SendKeyEvent(false, Enum.KeyCode.Z, false, game) end)
         end
+        if kr then pcall(kr, 0x5A) end
 
         -- 4. Move Cancel: Unequip or Swap
         local mode = tostring(GodhumanZ.CancelMode or "Unequip")
@@ -298,7 +386,7 @@ function GodhumanZ.Trigger()
     return true
 end
 
--- ========= 7. PUBLIC API & LISTENERS =========
+-- ========= 8. PUBLIC API & LISTENERS =========
 function GodhumanZ.SetEnabled(state)
     GodhumanZ.Enabled = (state == true)
     _G.VinsersHub_GodhumanZ = GodhumanZ.Enabled
@@ -359,7 +447,7 @@ function GodhumanZ.IsOnCooldown()
     return isSoaringBeastOnCooldown()
 end
 
--- Direct key listener (clean, ignores gameProcessed so E/Z works anywhere)
+-- Direct key listener for Godhuman Z Boost Keybind (default [E])
 UserInputService.InputBegan:Connect(function(input)
     if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
     if UserInputService:GetFocusedTextBox() then return end

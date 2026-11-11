@@ -606,19 +606,6 @@ QuickBox:AddToggle("QuickAntiStun", {
     end
 })
 
-QuickBox:AddToggle("QuickSoulGuitarDash", {
-    Text = "Soul Guitar Dash Glitch",
-    Default = false,
-    Tooltip = "Sets DashLength to 121 studs for infinite distance dashes",
-    Callback = function(Value)
-        local mm = M.getMoveMod()
-        if mm and mm.SetSoulGuitarDash then mm.SetSoulGuitarDash(Value) end
-        if Toggles.SoulGuitarDash and Toggles.SoulGuitarDash.Value ~= Value then
-            Toggles.SoulGuitarDash:SetValue(Value)
-        end
-    end
-})
-
 QuickBox:AddToggle("QuickSuperJump", {
     Text = "Super Jump",
     Default = false,
@@ -1411,20 +1398,6 @@ SpeedBox:AddSlider("DashDistance", {
     Callback = function(Value)
         local mm = M.getMoveMod()
         if mm then mm.SetDashDistance(Value) end
-    end
-})
-
-SpeedBox:AddToggle("SoulGuitarDash", {
-    Text = "Soul Guitar Dash Glitch",
-    Default = false,
-    Tooltip = "Bypasses dash physics and sets DashLength to 121 studs for infinite distance dashes",
-    Callback = function(Value)
-        local mm = M.getMoveMod()
-        if mm and mm.SetSoulGuitarDash then mm.SetSoulGuitarDash(Value) end
-        if Toggles.QuickSoulGuitarDash and Toggles.QuickSoulGuitarDash.Value ~= Value then
-            Toggles.QuickSoulGuitarDash:SetValue(Value)
-        end
-        Library:Notify("Soul Guitar Dash Glitch: " .. (Value and "Active" or "Inactive"), 2)
     end
 })
 

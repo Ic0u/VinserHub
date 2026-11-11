@@ -16,7 +16,17 @@ local velocityPower = 400
 local boostDuration = 0.9
 local isCooldown = false
 
+local function isHoldingSanguine()
+    local char = player and player.Character
+    local tool = char and char:FindFirstChildOfClass("Tool")
+    if tool and string.find(string.lower(tool.Name), "sanguine") then
+        return true
+    end
+    return false
+end
+
 local function doBoost()
+    if not isHoldingSanguine() then return end
     local character = player.Character
     if not character then return end
     
@@ -94,6 +104,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
     if UserInputService:GetFocusedTextBox() then return end
     if not (_G.DarlingX_SanguineBoost or _G.VinsersHub_SanguineBoost) then return end
+    if not isHoldingSanguine() then return end
 
     local match = false
     if typeof(boundSanguineKey) == "EnumItem" then
