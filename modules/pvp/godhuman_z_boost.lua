@@ -235,67 +235,7 @@ local function doLaunch(targetHrp)
     end)
 end
 
--- ========= 6. AUTO GLITCH ON IN-GAME SKILL CAST =========
-function GodhumanZ.OnSkillCast(tool)
-    if not GodhumanZ.Enabled then return end
-    if GodhumanZ.IsExecuting then return end
-    GodhumanZ.IsExecuting = true
-
-    task.spawn(function()
-        local char = LocalPlayer.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if not hum or not hrp then
-            GodhumanZ.IsExecuting = false
-            return
-        end
-
-        -- 1. Aimlock snap to enemy if enabled
-        local target = nil
-        if GodhumanZ.AimlockEnabled then
-            target = getTarget(1000)
-            if target then
-                startAimlock(target)
-            end
-        end
-
-        -- 2. Exact micro-delay for Soaring Beast dash windup
-        task.wait(0.12)
-
-        -- 3. Cancel move by unequipping tool or swapping
-        local mode = tostring(GodhumanZ.CancelMode or "Unequip")
-        if mode:find("Unequip") or mode == "None" then
-            pcall(function() hum:UnequipTools() end)
-        else
-            local swapTool = getTool(mode)
-            if swapTool then
-                pcall(function() hum:EquipTool(swapTool) end)
-            else
-                pcall(function() hum:UnequipTools() end)
-            end
-        end
-
-        -- 4. Launch 373 power, 90° sky arc
-        local tHrp = target and target:FindFirstChild("HumanoidRootPart")
-        doLaunch(tHrp)
-
-        -- 5. Re-equip Godhuman upon landing
-        if GodhumanZ.SwitchBack and tool then
-            task.delay(GLIDE_DURATION + 0.05, function()
-                local c = LocalPlayer.Character
-                local h = c and c:FindFirstChildOfClass("Humanoid")
-                if h and tool and tool.Parent ~= c then
-                    pcall(function() h:EquipTool(tool) end)
-                end
-            end)
-        end
-
-        task.wait(0.3)
-        GodhumanZ.IsExecuting = false
-    end)
-end
-
--- ========= 7. MANUAL TRIGGER (KEYBIND [E] OR UI BUTTON) =========
+-- ========= 6. TRIGGER THE BOOST (KEYBIND [E] OR UI BUTTON ONLY) =========
 function GodhumanZ.Trigger()
     if GodhumanZ.IsExecuting then return false end
 
