@@ -110,7 +110,27 @@ function RequireModule(relPath)
         return LoadedModules[relPath]
     end
 
-    -- 1. Check local executor disk storage first (dev/offline support)
+    -- 1. Fresh remote fetch from GitHub repository (ensures latest commits run immediately)
+    local cacheBuster = tostring(os.time()) .. "_" .. tostring(math.random(1000, 9999))
+    local remoteUrl = GITHUB_REPO_RAW .. "/" .. relPath .. "?t=" .. cacheBuster
+    local body = SafeHttpGet(remoteUrl)
+    if body and #body > 50 then
+        local okCompile, fn = pcall(loadstring, body)
+        if okCompile and fn then
+            local okRun, result = pcall(fn)
+            if okRun and result then
+                LoadedModules[relPath] = result
+                -- Sync cache to disk for offline fallback
+                pcall(function()
+                    local writefile = writefile or (syn and syn.writefile)
+                    if writefile then writefile("VinsersHub/" .. relPath, body) end
+                end)
+                return result
+            end
+        end
+    end
+
+    -- 2. Fallback to local executor disk storage only if network fetch fails
     local isfileFn = isfile or (syn and syn.isfile)
     local readfileFn = readfile or (syn and syn.readfile)
     if isfileFn and readfileFn then
@@ -136,32 +156,6 @@ function RequireModule(relPath)
                         end
                     end
                 end
-            end
-        end
-    end
-
-    -- 2. Fresh remote fetch from GitHub repository
-    local cacheBuster = tostring(os.time()) .. "_" .. tostring(math.random(1000, 9999))
-    local remoteUrl = GITHUB_REPO_RAW .. "/" .. relPath .. "?t=" .. cacheBuster
-    local body = SafeHttpGet(remoteUrl)
-    if body and #body > 50 then
-        local okCompile, fn = pcall(loadstring, body)
-        if okCompile and fn then
-            local okRun, result = pcall(fn)
-            if okRun and result then
-                LoadedModules[relPath] = result
-                pcall(function()
-                    local makeFolder = makefolder or (syn and syn.makefolder)
-                    local writefile = writefile or (syn and syn.writefile)
-                    local isfolder = isfolder or (syn and syn.isfolder)
-                    if isfolder and makeFolder and not isfolder("VinsersHub") then
-                        makeFolder("VinsersHub")
-                    end
-                    if writefile then
-                        writefile("VinsersHub/" .. relPath, body)
-                    end
-                end)
-                return result
             end
         end
     end
@@ -426,29 +420,27 @@ end
 local CurrentExecutor = GetExecutorName()
 local CurrentGitVersion = GetGitVersion()
 
--- Format: Vinser Hub (executor - version-gitCommit) stripped down player name & channel to prevent overflow
-local WINDOW_TITLE = string.format("Vinser Hub (%s - version-%s)", CurrentExecutor, CurrentGitVersion)
+-- Compact title to guarantee zero header/tab overflow on any resolution
+local shortGit = tostring(CurrentGitVersion):sub(1, 7)
+local WINDOW_TITLE = string.format("Vinser Hub (%s - %s)", CurrentExecutor, shortGit)
 
 -- Create Window
 local Window = Library:CreateWindow({
     Title = WINDOW_TITLE,
     Center = true,
     AutoShow = true,
-    TabPadding = 5,
+    TabPadding = 4,
     MenuFadeTime = 0.2
 })
 
--- Navigation Tabs
+-- Navigation Tabs (6 logical tabs: Zero header overflow, clean layout)
 local Tabs = {
     Dashboard = Window:AddTab("Dashboard"),
     Combat = Window:AddTab("Combat"),
-    PvP = Window:AddTab("PvP & Tech"),
     Movement = Window:AddTab("Movement"),
     Visuals = Window:AddTab("Visuals"),
-    Soru = Window:AddTab("Soru"),
     Macro = Window:AddTab("Macro"),
-    Misc = Window:AddTab("Misc"),
-    ["UI Settings"] = Window:AddTab("UI Settings"),
+    Settings = Window:AddTab("Settings"),
 }
 
 -- Synchronize Camlock UI if changed outside the menu
@@ -985,10 +977,8 @@ BlacklistBox:AddDropdown("BLGun", {
     end
 })
 
--- ============================================================
--- TAB 3: PVP & TECH
--- ============================================================
-local AutoCombatBox = Tabs.PvP:AddLeftGroupbox("Auto Combat")
+-- Auto Combat & Offense (Unified Combat & PvP Tab)
+local AutoCombatBox = Tabs.Combat:AddLeftGroupbox("Auto Combat")
 
 AutoCombatBox:AddToggle("FastAttack", {
     Text = "Fast Attack (Burst M1)",
@@ -1064,7 +1054,7 @@ AutoCombatBox:AddToggle("AntiKnockback", {
     end
 })
 
-local GunAuraBox = Tabs.PvP:AddLeftGroupbox("M1 Gun Aura Engine")
+local GunAuraBox = Tabs.Combat:AddLeftGroupbox("M1 Gun Aura Engine")
 
 local GunAuraToggle = GunAuraBox:AddToggle("GunAuraEnabled", {
     Text = "M1 Gun Aura",
@@ -1162,7 +1152,7 @@ AutoCombatBox:AddToggle("DragonGunM1", {
     end
 })
 
-local CamlockTechBox = Tabs.PvP:AddRightGroupbox("Camlock & Combat Tech")
+local CamlockTechBox = Tabs.Combat:AddRightGroupbox("Camlock & Combat Tech")
 
 local CamlockToggle = CamlockTechBox:AddToggle("Camlock", {
     Text = "Camlock",
@@ -1219,7 +1209,7 @@ local SanguineToggle = CamlockTechBox:AddToggle("SanguineBoost", {
 })
 
 SanguineToggle:AddKeyPicker("SanguineKeybind", {
-    Default = "Z",
+    Default = "None",
     SyncToggleState = false,
     Mode = "Toggle",
     Text = "Sanguine Keybind",
@@ -1609,10 +1599,8 @@ ESPRight:AddButton({
     end
 })
 
--- ============================================================
--- TAB 6: SORU (FLASHSTEP AUTOMATION)
--- ============================================================
-local SoruLeft = Tabs.Soru:AddLeftGroupbox("Flashstep Engine")
+-- Flashstep Engine (Unified Movement Tab)
+local SoruLeft = Tabs.Movement:AddLeftGroupbox("Flashstep Engine (Soru)")
 
 SoruLeft:AddToggle("InfiniteSoru", {
     Text = "Infinite Soru",
@@ -1691,7 +1679,7 @@ SoruLeft:AddSlider("MaxSoruRange", {
     end
 })
 
-local SoruRight = Tabs.Soru:AddRightGroupbox("Soru Skill Combo")
+local SoruRight = Tabs.Movement:AddRightGroupbox("Soru Skill Combo")
 
 SoruRight:AddToggle("AutoSkillOnSoru", {
     Text = "Auto Skill on Soru",
@@ -1919,10 +1907,8 @@ for b = 1, 6 do
     end
 end
 
--- ============================================================
--- TAB 8: MISC & PERFORMANCE
--- ============================================================
-local PerformanceBox = Tabs.Misc:AddLeftGroupbox("Client Optimization")
+-- Client Optimization & Server Tools (Unified Settings Tab)
+local PerformanceBox = Tabs.Settings:AddLeftGroupbox("Client Optimization")
 
 PerformanceBox:AddToggle("FFlags1", {
     Text = "FFlags 1 (FPS Booster)",
@@ -1966,7 +1952,7 @@ PerformanceBox:AddButton({
     end
 })
 
-local ServerToolsBox = Tabs.Misc:AddRightGroupbox("Server & World Tools")
+local ServerToolsBox = Tabs.Settings:AddLeftGroupbox("Server & World Tools")
 
 ServerToolsBox:AddButton({
     Text = "Copy Server JobId",
@@ -2014,10 +2000,7 @@ ServerToolsBox:AddButton({
     end
 })
 
--- ============================================================
--- TAB 9: UI SETTINGS & CONFIG MANAGER
--- ============================================================
-local MenuSettingsBox = Tabs["UI Settings"]:AddLeftGroupbox("Menu Settings")
+local MenuSettingsBox = Tabs.Settings:AddLeftGroupbox("Menu Settings")
 
 MenuSettingsBox:AddButton({
     Text = "Unload Vinsers Hub",
@@ -2053,8 +2036,8 @@ SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
 ThemeManager:SetFolder("VinsersHub")
 SaveManager:SetFolder("VinsersHub/BloxFruits")
 
-SaveManager:BuildConfigSection(Tabs["UI Settings"])
-ThemeManager:ApplyToTab(Tabs["UI Settings"])
+SaveManager:BuildConfigSection(Tabs.Settings)
+ThemeManager:ApplyToTab(Tabs.Settings)
 
 -- ============================================================
 -- WATERMARK & LIVE TELEMETRY THREAD
@@ -2102,16 +2085,14 @@ task.spawn(function()
                 PlayersLabel:SetText(string.format("Players: %d / %d", #Players:GetPlayers(), Players.MaxPlayers))
             end
 
-            local data = LocalPlayer and (LocalPlayer:FindFirstChild("Data") or LocalPlayer:FindFirstChild("leaderstats"))
+            -- 1. Read character progression from LocalPlayer.Data
+            local data = LocalPlayer and LocalPlayer:FindFirstChild("Data")
             if data then
                 local lvl = data:FindFirstChild("Level")
                 if LevelLabel then LevelLabel:SetText("Level: " .. (lvl and tostring(lvl.Value) or "--")) end
 
                 local beli = data:FindFirstChild("Beli")
                 if BeliLabel then BeliLabel:SetText("Beli: " .. (beli and ("$" .. FormatNumber(beli.Value)) or "--")) end
-
-                local bnty = data:FindFirstChild("Bounty") or data:FindFirstChild("Bounty/Honor")
-                if BountyLabel then BountyLabel:SetText("Bounty: " .. (bnty and FormatNumber(bnty.Value) or "--")) end
 
                 local df = data:FindFirstChild("DevilFruit")
                 if FruitLabel then FruitLabel:SetText("Devil Fruit: " .. (df and tostring(df.Value):gsub("-%w+", "") or "None")) end
@@ -2120,8 +2101,50 @@ task.spawn(function()
                 if RaceLabel then RaceLabel:SetText("Race: " .. (race and tostring(race.Value) or "--")) end
             end
 
-            if TeamLabel and LocalPlayer and LocalPlayer.Team then
-                TeamLabel:SetText("Faction: " .. tostring(LocalPlayer.Team.Name))
+            -- 2. Read Bounty / Honor comprehensively from leaderstats, Data, attributes, or GUI
+            local bountyVal = nil
+            local ls = LocalPlayer and LocalPlayer:FindFirstChild("leaderstats")
+            if ls then
+                local b = ls:FindFirstChild("Bounty/Honor")
+                    or ls:FindFirstChild("Bounty / Honor")
+                    or ls:FindFirstChild("Bounty")
+                    or ls:FindFirstChild("Honor")
+                if b and b.Value then bountyVal = b.Value end
+            end
+            if not bountyVal and data then
+                local b = data:FindFirstChild("Bounty") or data:FindFirstChild("Honor") or data:FindFirstChild("Bounty/Honor")
+                if b and b.Value then bountyVal = b.Value end
+            end
+            if not bountyVal and LocalPlayer then
+                local attr = LocalPlayer:GetAttribute("Bounty") or LocalPlayer:GetAttribute("Honor") or LocalPlayer:GetAttribute("Bounty/Honor")
+                if attr then bountyVal = attr end
+            end
+            if not bountyVal then
+                local pg = LocalPlayer and LocalPlayer:FindFirstChildOfClass("PlayerGui")
+                local mainGui = pg and pg:FindFirstChild("Main")
+                if mainGui then
+                    local bGui = mainGui:FindFirstChild("Bounty", true) or mainGui:FindFirstChild("Honor", true)
+                    if bGui and bGui:IsA("TextLabel") and bGui.Text ~= "" then
+                        bountyVal = tonumber(bGui.Text:gsub("[^%d]", ""))
+                    end
+                end
+            end
+
+            if BountyLabel then
+                if bountyVal and tonumber(bountyVal) then
+                    BountyLabel:SetText("Bounty: " .. FormatNumber(tonumber(bountyVal)))
+                else
+                    BountyLabel:SetText("Bounty: --")
+                end
+            end
+
+            -- 3. Read Team / Faction
+            if TeamLabel and LocalPlayer then
+                if LocalPlayer.Team then
+                    TeamLabel:SetText("Faction: " .. tostring(LocalPlayer.Team.Name))
+                else
+                    TeamLabel:SetText("Faction: Unassigned")
+                end
             end
         end)
     end
@@ -2145,36 +2168,6 @@ task.spawn(function()
         M.getMacro()
         M.getClientTweaks()
     end)
-end)
-
--- Master Global Input Dispatcher (Bypasses UI library nuances and ContextActionService locks)
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
-    if UserInputService:GetFocusedTextBox() then return end
-
-    local keyName = input.KeyCode.Name
-
-    -- 1. Godhuman Z Boost Keybind
-    if Toggles.GodhumanZBoost and Toggles.GodhumanZBoost.Value and Options.GodhumanZKeybind then
-        local bound = Options.GodhumanZKeybind.Value
-        if bound and bound ~= "None" and keyName == bound then
-            local gz = M.getGodhumanZ()
-            if gz and gz.Trigger then
-                gz.Trigger()
-            end
-        end
-    end
-
-    -- 2. Sanguine Boost Keybind
-    if Toggles.SanguineBoost and Toggles.SanguineBoost.Value and Options.SanguineKeybind then
-        local bound = Options.SanguineKeybind.Value
-        if bound and bound ~= "None" and keyName == bound then
-            local sb = M.getSanguineBoost()
-            if sb and sb.Trigger then
-                sb.Trigger()
-            end
-        end
-    end
 end)
 
 -- Load auto-saved config profile if exists

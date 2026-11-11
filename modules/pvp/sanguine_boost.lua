@@ -15,7 +15,19 @@ local boostDuration = 0.9
 local isCooldown = false
 local sanguineEnabled = false
 
+local function isHoldingSanguine()
+    local char = player and player.Character
+    local tool = char and char:FindFirstChildOfClass("Tool")
+    if tool and string.find(string.lower(tool.Name), "sanguine") then
+        return true
+    end
+    return false
+end
+
 local function doBoost()
+    -- STRICT GUARD: Never boost unless player is actively holding Sanguine Art
+    if not isHoldingSanguine() then return end
+
     local character = player.Character
     if not character then return end
 
@@ -52,6 +64,7 @@ end
 
 local function triggerBoost()
     if not sanguineEnabled then return end
+    if not isHoldingSanguine() then return end
     if isCooldown then return end
     isCooldown = true
     doBoost()
