@@ -152,8 +152,8 @@ function MovementEngine.SetDashLength(enabled, value)
         pcall(function()
             local char = LocalPlayer and LocalPlayer.Character
             if char then
-                char:SetAttribute("DashLength", 1)
-                char:SetAttribute("DashLengthAir", 1)
+                char:SetAttribute("DashLength", nil)
+                char:SetAttribute("DashLengthAir", nil)
             end
         end)
     end
