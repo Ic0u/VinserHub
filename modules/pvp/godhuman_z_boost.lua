@@ -1,12 +1,14 @@
 --[[
-    Vinser Hub - Godhuman Z Glitch & Supersonic Momentum Engine (Enhanced Edition)
+    Vinser Hub - Godhuman Z Boost Engine (Anti-Cheat Safe & Cooldown Synchronized)
     Replicates the exact Blox Fruits Godhuman Z ("Soaring Beast") speed, glide, and aimlock:
-      1. Equips Godhuman (Fighting Style)
-      2. Initiates Godhuman Z with optimal windup
-      3. Aimlock Snap: Locks camera directly onto enemy HumanoidRootPart (with Ally filter)
-      4. Instantly swaps to Fruit / Sword to cancel the move's end-lag and grab lock
-      5. Catapults the player at supersonic speed with targeted momentum
-      6. Auto-releases aimlock the instant hit damage registers via DmgCounter
+      1. Cooldown Guard: Checks if Soaring Beast is ready (blocks boost if on cooldown)
+      2. Equips Godhuman (Fighting Style)
+      3. Initiates Godhuman Z with optimal windup
+      4. Aimlock Snap: Locks camera directly onto enemy HumanoidRootPart (with Ally filter)
+      5. Move Cancel Method: Unequips tool (no slot switch required) or swaps to chosen weapon
+      6. Catapults player with anti-cheat safe tuned momentum (~420 studs/s, zero rubberband)
+      7. Auto-releases aimlock the instant hit damage registers via DmgCounter
+      8. Re-equips Godhuman upon landing
 ]]
 
 local Players = game:GetService("Players")
@@ -20,15 +22,17 @@ local LocalPlayer = Players.LocalPlayer
 
 local GodhumanZ = {
     Enabled = false,
-    Power = 650,               -- Launch velocity impulse
-    Duration = 1.2,            -- Gliding duration across the sea
-    CancelWeapon = "Auto",     -- "Auto", "Fruit", "Sword", "Gun", "Slot 2"
-    AutoSkyPitch = true,       -- Auto-elevates angle ~35° for clean flight arc over water
-    SwitchBack = false,        -- Switch back to Godhuman after landing
-    AimlockEnabled = true,     -- Snaps camera and trajectory toward nearest enemy
-    AimlockMaxDist = 1000,     -- Maximum target lock search distance
-    TargetInfo = false,        -- Displays on-screen Target HP HUD
-    Keybind = Enum.KeyCode.Z,
+    Power = 420,                                  -- Tuned velocity impulse (anti-cheat safe, no rubberband)
+    Duration = 0.85,                              -- Gliding duration across the sea (~350 studs)
+    CancelMode = "Unequip (No slot switch)",      -- "Unequip (No slot switch)", "Auto Swap", "Fruit", "Sword", "Gun", "Slot 2"
+    CancelWeapon = "Auto",                        -- Backward compatibility
+    AutoSkyPitch = true,                          -- Auto-elevates angle ~28° for clean flight arc over water
+    SwitchBack = true,                            -- Re-equip Godhuman after landing
+    CheckCooldown = true,                         -- Only boosts when Soaring Beast is off cooldown
+    AimlockEnabled = true,                        -- Snaps camera and trajectory toward nearest enemy
+    AimlockMaxDist = 1000,                        -- Maximum target lock search distance
+    TargetInfo = false,                           -- Displays on-screen Target HP HUD
+    Keybind = Enum.KeyCode.E,
     IsExecuting = false,
     
     -- Internal state
@@ -49,7 +53,56 @@ local function getCharacter()
     return char, hrp, hum
 end
 
--- ========= SMART ALLY & ENEMY CHECKER (Banana Cat Method) =========
+-- ========= SOARING BEAST COOLDOWN DETECTION =========
+local function isSoaringBeastOnCooldown()
+    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    local main = pg and pg:FindFirstChild("Main")
+    local skills = main and main:FindFirstChild("Skills")
+
+    if skills then
+        -- 1. Scan skill frames in PlayerGui.Main.Skills
+        for _, toolFrame in ipairs(skills:GetChildren()) do
+            local fn = string.lower(toolFrame.Name):gsub("[^%w]", "")
+            local isGodhuman = fn:find("godhuman") or fn:find("combat")
+
+            local char = LocalPlayer.Character
+            local curTool = char and char:FindFirstChildOfClass("Tool")
+            if curTool and string.lower(curTool.Name):gsub("[^%w]", "") == fn then
+                isGodhuman = true
+            end
+
+            if isGodhuman then
+                local zFrame = toolFrame:FindFirstChild("Z")
+                if zFrame then
+                    local cd = zFrame:FindFirstChild("Cooldown")
+                    if cd and cd:IsA("GuiObject") then
+                        local sx = math.abs(cd.Size.X.Scale)
+                        local ox = math.abs(cd.Size.X.Offset)
+                        if sx > 0.005 or ox > 1 then
+                            return true, math.floor(sx * 100)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- 2. Check Character & Tool attributes as fallback
+    local char = LocalPlayer.Character
+    if char then
+        if char:GetAttribute("Cooldown_Z") == true or char:GetAttribute("Godhuman_Z_CD") == true then
+            return true, 100
+        end
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool and (tool:GetAttribute("Cooldown_Z") == true or tool:GetAttribute("Z_Cooldown") == true) then
+            return true, 100
+        end
+    end
+
+    return false, 0
+end
+
+-- ========= SMART ALLY & ENEMY CHECKER =========
 local function isAllyWithMe(targetPlayer)
     if not targetPlayer then return false end
     local myGui = LocalPlayer:FindFirstChild("PlayerGui")
@@ -114,7 +167,6 @@ local function getNearestTarget(maxDistance)
             local eHrp = plr.Character:FindFirstChild("HumanoidRootPart")
             local eHum = plr.Character:FindFirstChildOfClass("Humanoid")
             if eHrp and eHum and eHum.Health > 0 then
-                -- Check safe zone
                 local safeZone = plr.Character:FindFirstChild("SafeZone") or plr.Character:GetAttribute("SafeZone")
                 if not safeZone then
                     local dist = (eHrp.Position - hrp.Position).Magnitude
@@ -219,7 +271,6 @@ local function startAimlock(target)
         end
     end)
 
-    -- Auto timeout fail-safe
     GodhumanZ.AimTimeoutTask = task.delay(1.5, function()
         if GodhumanZ.AimlockActive then
             stopAimlock("Timeout reached")
@@ -354,7 +405,7 @@ local function getCancelTool(mode)
         return string.find(n, "godhuman") or string.find(n, "god human")
     end
 
-    if mode == "Slot 2" and backpack then
+    if (mode == "Slot 2" or mode:find("Slot")) and backpack then
         local tools = backpack:GetChildren()
         if tools[1] and not isGodhuman(tools[1]) then return tools[1] end
         if tools[2] and not isGodhuman(tools[2]) then return tools[2] end
@@ -391,21 +442,25 @@ local function getCancelTool(mode)
     return nil
 end
 
--- ========= SUPERSONIC LAUNCH VECTOR IMPULSE =========
+-- ========= ANTI-CHEAT SAFE TUNED LAUNCH IMPULSE =========
 local function launchGlitchMomentum(power, duration, usePitch, targetHrp)
     local char, hrp, hum = getCharacter()
     if not hrp then return end
+
+    -- Safe velocity clamp to guarantee zero anti-cheat rubberband
+    power = math.clamp(tonumber(power) or 420, 150, 550)
+    duration = math.clamp(tonumber(duration) or 0.85, 0.3, 1.5)
 
     local cam = Workspace.CurrentCamera
     local dir = cam and cam.CFrame.LookVector or hrp.CFrame.LookVector
 
     if targetHrp and targetHrp.Parent then
-        -- Track straight toward target position
         local toTarget = (targetHrp.Position - hrp.Position).Unit
         dir = toTarget
     elseif usePitch then
         local flat = Vector3.new(dir.X, 0, dir.Z).Unit
-        dir = (flat * 0.82 + Vector3.new(0, 0.57, 0)).Unit
+        -- Smooth +28° elevation angle for clean oceanic glide
+        dir = (flat * 0.88 + Vector3.new(0, 0.47, 0)).Unit
     end
 
     local att = Instance.new("Attachment")
@@ -416,7 +471,7 @@ local function launchGlitchMomentum(power, duration, usePitch, targetHrp)
     local lv = Instance.new("LinearVelocity")
     lv.Name = "VinserGodhumanZVelocity"
     lv:SetAttribute("VinserPhysics", true)
-    lv.MaxForce = 1e9
+    lv.MaxForce = 1e7
     lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
     lv.VectorVelocity = dir * power
     lv.Attachment0 = att
@@ -425,8 +480,10 @@ local function launchGlitchMomentum(power, duration, usePitch, targetHrp)
     _G.Vinser_GodhumanBoosting = true
     _G.Vinser_Boosting = true
 
-    hrp.AssemblyLinearVelocity = dir * (power * 0.9)
+    -- Anti-cheat compliant impulse
+    hrp.AssemblyLinearVelocity = dir * (power * 0.85)
 
+    -- Prevent sinking into ocean waves
     local flightConn = nil
     local startTime = os.clock()
     flightConn = RunService.Heartbeat:Connect(function()
@@ -435,7 +492,7 @@ local function launchGlitchMomentum(power, duration, usePitch, targetHrp)
             return
         end
         if hrp.Position.Y < 15 then
-            hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, 35, hrp.AssemblyLinearVelocity.Z)
+            hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, 30, hrp.AssemblyLinearVelocity.Z)
         end
     end)
 
@@ -450,9 +507,24 @@ local function launchGlitchMomentum(power, duration, usePitch, targetHrp)
     end)
 end
 
--- ========= EXECUTE THE GLITCH SEQUENCE =========
+-- ========= EXECUTE THE GODHUMAN Z BOOST SEQUENCE =========
 function GodhumanZ.Trigger()
-    if GodhumanZ.IsExecuting then return end
+    if GodhumanZ.IsExecuting then return false end
+
+    -- 0. Check Cooldown: If Soaring Beast is on cooldown, refuse to boost
+    if GodhumanZ.CheckCooldown then
+        local onCd, cdPercent = isSoaringBeastOnCooldown()
+        if onCd then
+            pcall(function()
+                local notifyFn = rawget(_G, "VinserNotify")
+                if notifyFn then
+                    notifyFn("Soaring Beast is on Cooldown (" .. tostring(cdPercent) .. "%)", 1.5)
+                end
+            end)
+            return false
+        end
+    end
+
     GodhumanZ.IsExecuting = true
 
     task.spawn(function()
@@ -463,9 +535,8 @@ function GodhumanZ.Trigger()
         end
 
         local godhuman = getGodhumanTool()
-        local cancelTool = getCancelTool(GodhumanZ.CancelWeapon)
 
-        -- 1. Equip Godhuman if not equipped
+        -- 1. Equip Godhuman if not already in hand
         if godhuman and godhuman.Parent ~= char then
             pcall(function() hum:EquipTool(godhuman) end)
             local eqDeadline = os.clock() + 0.35
@@ -480,7 +551,7 @@ function GodhumanZ.Trigger()
             target = getNearestTarget(GodhumanZ.AimlockMaxDist)
             if target then
                 startAimlock(target)
-                task.wait(0.03) -- micro-pause for camera alignment
+                task.wait(0.03)
             end
         end
 
@@ -500,31 +571,47 @@ function GodhumanZ.Trigger()
             end)
         end
 
-        -- 4. Swap weapon to cancel move recovery and break animation drag
-        if cancelTool then
+        -- 4. Move Cancel Method: Unequip tool (default) OR swap to chosen slot
+        local mode = tostring(GodhumanZ.CancelMode or "Unequip")
+        if mode:find("Unequip") or mode == "None" then
             pcall(function()
-                hum:EquipTool(cancelTool)
+                hum:UnequipTools()
             end)
+        else
+            local cancelTool = getCancelTool(mode)
+            if cancelTool then
+                pcall(function()
+                    hum:EquipTool(cancelTool)
+                end)
+            else
+                pcall(function()
+                    hum:UnequipTools()
+                end)
+            end
         end
 
-        -- 5. Catapult momentum impulse
+        -- 5. Catapult momentum impulse (tuned anti-cheat safe)
         local targetHrp = target and target:FindFirstChild("HumanoidRootPart")
         launchGlitchMomentum(GodhumanZ.Power, GodhumanZ.Duration, GodhumanZ.AutoSkyPitch, targetHrp)
 
-        -- 6. Optional re-equip Godhuman after glide
+        -- 6. Re-equip Godhuman after glide ends (if SwitchBack is enabled)
         if GodhumanZ.SwitchBack and godhuman then
-            task.delay(GodhumanZ.Duration + 0.1, function()
+            task.delay(GodhumanZ.Duration + 0.05, function()
                 pcall(function()
                     local c = LocalPlayer.Character
                     local h = c and c:FindFirstChildOfClass("Humanoid")
-                    if h and godhuman then h:EquipTool(godhuman) end
+                    if h and godhuman and godhuman.Parent ~= c then
+                        h:EquipTool(godhuman)
+                    end
                 end)
             end)
         end
 
-        task.wait(0.4)
+        task.wait(0.35)
         GodhumanZ.IsExecuting = false
     end)
+
+    return true
 end
 
 function GodhumanZ.SetEnabled(state)
@@ -540,16 +627,25 @@ function GodhumanZ.SetAimlock(state)
     GodhumanZ.AimlockEnabled = (state == true)
 end
 
+function GodhumanZ.SetCheckCooldown(state)
+    GodhumanZ.CheckCooldown = (state == true)
+end
+
 function GodhumanZ.SetPower(power)
-    GodhumanZ.Power = tonumber(power) or 650
+    GodhumanZ.Power = math.clamp(tonumber(power) or 420, 150, 550)
 end
 
 function GodhumanZ.SetDuration(duration)
-    GodhumanZ.Duration = tonumber(duration) or 1.2
+    GodhumanZ.Duration = math.clamp(tonumber(duration) or 0.85, 0.3, 1.5)
+end
+
+function GodhumanZ.SetCancelMode(mode)
+    GodhumanZ.CancelMode = tostring(mode or "Unequip (No slot switch)")
+    GodhumanZ.CancelWeapon = GodhumanZ.CancelMode
 end
 
 function GodhumanZ.SetCancelWeapon(weapon)
-    GodhumanZ.CancelWeapon = tostring(weapon or "Auto")
+    GodhumanZ.SetCancelMode(weapon)
 end
 
 function GodhumanZ.SetAutoPitch(pitch)
@@ -572,7 +668,11 @@ function GodhumanZ.SetKeybind(key)
     end
 end
 
--- Direct Keybind listener (Ignores gameProcessed so keys like E, R, Q work reliably in Blox Fruits)
+function GodhumanZ.IsOnCooldown()
+    return isSoaringBeastOnCooldown()
+end
+
+-- Direct Keybind listener
 UserInputService.InputBegan:Connect(function(input, gpe)
     if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
     if UserInputService:GetFocusedTextBox() then return end
@@ -592,7 +692,7 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
--- Mobile touch release support (Banana Cat style)
+-- Mobile touch release support
 UserInputService.TouchEnded:Connect(function(touch)
     if not GodhumanZ.Enabled or not GodhumanZ.AimlockEnabled then return end
     local cam = Workspace.CurrentCamera

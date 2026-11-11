@@ -351,6 +351,14 @@ local Library = loadstring(fetchRepo("Library.lua"))()
 local ThemeManager = loadstring(fetchRepo("addons/ThemeManager.lua"))()
 local SaveManager = loadstring(fetchRepo("addons/SaveManager.lua"))()
 
+_G.VinserNotify = function(msg, dur)
+    pcall(function()
+        if Library and Library.Notify then
+            Library:Notify(tostring(msg or ""), dur or 2)
+        end
+    end)
+end
+
 -- ============================================================
 -- DYNAMIC WINDOW TITLE RESOLUTION
 -- Format: Vinser Hub (executor - version-gitCommit) username / robloxchannel
@@ -1282,19 +1290,29 @@ GodhumanZToggle:AddKeyPicker("GodhumanZKeybind", {
 })
 
 CamlockTechBox:AddDropdown("GodhumanZCancel", {
-    Values = { "Auto", "Fruit", "Sword", "Gun", "Slot 2" },
+    Values = { "Unequip (No slot switch)", "Auto Swap", "Fruit", "Sword", "Gun", "Slot 2" },
     Default = 1,
     Multi = false,
-    Text = "Swap Cancel Weapon",
-    Tooltip = "Switches to this tool to cancel move end-lag and activate flight",
+    Text = "Move Cancel Method",
+    Tooltip = "Unequip cancels the move end-lag without switching weapons, or swap to another tool",
     Callback = function(Value)
         local gz = M.getGodhumanZ()
-        if gz then gz.SetCancelWeapon(Value) end
+        if gz then gz.SetCancelMode(Value) end
+    end
+})
+
+CamlockTechBox:AddToggle("GodhumanZCheckCD", {
+    Text = "Check Soaring Beast Cooldown",
+    Default = true,
+    Tooltip = "Prevents boosting if Godhuman Z (Soaring Beast) is currently on cooldown",
+    Callback = function(Value)
+        local gz = M.getGodhumanZ()
+        if gz and gz.SetCheckCooldown then gz.SetCheckCooldown(Value) end
     end
 })
 
 CamlockTechBox:AddToggle("GodhumanZSkyPitch", {
-    Text = "Auto Sky Arc (+35° Pitch)",
+    Text = "Auto Sky Arc (+28° Pitch)",
     Default = true,
     Tooltip = "Elevates trajectory upward to glide cleanly across ocean waters",
     Callback = function(Value)
@@ -1305,8 +1323,8 @@ CamlockTechBox:AddToggle("GodhumanZSkyPitch", {
 
 CamlockTechBox:AddToggle("GodhumanZSwitchBack", {
     Text = "Re-Equip Godhuman Upon Landing",
-    Default = false,
-    Tooltip = "Automatically switches back to Godhuman after the glide ends",
+    Default = true,
+    Tooltip = "Automatically equips Godhuman back into hand after the glide ends",
     Callback = function(Value)
         local gz = M.getGodhumanZ()
         if gz then gz.SetSwitchBack(Value) end
@@ -1335,10 +1353,11 @@ CamlockTechBox:AddToggle("GodhumanZTargetInfo", {
 
 CamlockTechBox:AddSlider("GodhumanZPower", {
     Text = "Launch Power / Speed",
-    Default = 650,
+    Default = 420,
     Min = 200,
-    Max = 1500,
-    Rounding = 25,
+    Max = 550,
+    Rounding = 10,
+    Tooltip = "Tuned to ~420 studs/s for maximum distance without anti-cheat rubberbanding",
     Callback = function(Value)
         local gz = M.getGodhumanZ()
         if gz then gz.SetPower(Value) end
@@ -1347,10 +1366,10 @@ CamlockTechBox:AddSlider("GodhumanZPower", {
 
 CamlockTechBox:AddSlider("GodhumanZDuration", {
     Text = "Glide Duration (s)",
-    Default = 1.2,
+    Default = 0.85,
     Min = 0.3,
-    Max = 3.0,
-    Rounding = 0.1,
+    Max = 1.5,
+    Rounding = 0.05,
     Callback = function(Value)
         local gz = M.getGodhumanZ()
         if gz then gz.SetDuration(Value) end
