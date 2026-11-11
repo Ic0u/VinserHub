@@ -296,29 +296,12 @@ local sanguineBtnRef = nil
 local sanguinePulseActive = false
 
 local function doSanguineBoost()
+    -- Delegate to the sanguine_boost module instead of duplicating physics code
     if not _G.DarlingX_SanguineBoost then return end
-    pcall(function()
-        local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-
-        local cam = Workspace.CurrentCamera
-        local dir = cam and cam.CFrame.LookVector or hrp.CFrame.LookVector
-        local power = 400
-        local duration = 0.9
-
-        local att = Instance.new("Attachment", hrp)
-        local lv = Instance.new("LinearVelocity", hrp)
-        lv.MaxForce = math.huge
-        lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
-        lv.VectorVelocity = dir * power
-        lv.Attachment0 = att
-
-        task.delay(duration, function()
-            if lv and lv.Parent then lv:Destroy() end
-            if att and att.Parent then att:Destroy() end
-        end)
-    end)
+    local mod = rawget(_G, "VinsersHub_SanguineBoostMod")
+    if mod and mod.Trigger then
+        mod.Trigger()
+    end
 end
 
 local function updateSanguineVisual(isBoosting)

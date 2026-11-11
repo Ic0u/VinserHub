@@ -1224,14 +1224,11 @@ SanguineToggle:AddKeyPicker("SanguineKeybind", {
     Mode = "Toggle",
     Text = "Sanguine Keybind",
     Callback = function()
+        if not (Toggles.SanguineBoost and Toggles.SanguineBoost.Value) then return end
         local sb = M.getSanguineBoost()
         if sb and sb.Trigger then sb.Trigger() end
     end,
     ChangedCallback = function(NewKey)
-        local sb = M.getSanguineBoost()
-        if sb and sb.SetKeybind then
-            sb.SetKeybind(NewKey)
-        end
     end
 })
 

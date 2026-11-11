@@ -1,8 +1,7 @@
 --[[
-    Darling X - Sanguine Boost Z Module
-    Exact linear velocity impulse and Z keybind.
-    Linked to unified glass widget in extra_widgets.lua.
-    Zero emojis, zero third-party references.
+    Vinser Hub - Sanguine Boost Module
+    Forward velocity impulse triggered ONLY by dedicated keybind.
+    Does NOT intercept the natural in-game Z skill at all.
 ]]
 
 local Players = game:GetService("Players")
@@ -10,30 +9,20 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
-local camera = Workspace.CurrentCamera
 
 local velocityPower = 400
 local boostDuration = 0.9
 local isCooldown = false
-
-local function isHoldingSanguine()
-    local char = player and player.Character
-    local tool = char and char:FindFirstChildOfClass("Tool")
-    if tool and string.find(string.lower(tool.Name), "sanguine") then
-        return true
-    end
-    return false
-end
+local sanguineEnabled = false
 
 local function doBoost()
-    if not isHoldingSanguine() then return end
     local character = player.Character
     if not character then return end
-    
+
     local hrp = character:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    local cam = Workspace.CurrentCamera or camera
+    local cam = Workspace.CurrentCamera
     local dir = cam and cam.CFrame.LookVector or hrp.CFrame.LookVector
 
     local att = Instance.new("Attachment")
@@ -61,107 +50,32 @@ local function doBoost()
     end)
 end
 
-local function getWidgets()
-    if rawget(_G, "DarlingX_ExtraWidgets") then
-        return _G.DarlingX_ExtraWidgets
-    end
-    local hub = rawget(_G, "DarlingHub") or (getgenv and getgenv().DarlingHub)
-    if hub and hub.Require then
-        local w = hub:Require("modules/pvp/extra_widgets.lua")
-        if w then return w end
-    end
-    local req = (typeof(require) == "function") and require
-    if req and script and script.Parent then
-        local ok, w = pcall(req, script.Parent.extra_widgets)
-        if ok and w then return w end
-    end
-    return nil
-end
-
-local function triggerBoostWithVisual()
+local function triggerBoost()
+    if not sanguineEnabled then return end
     if isCooldown then return end
     isCooldown = true
-
     doBoost()
-
-    local widgets = getWidgets()
-    if widgets and widgets.UpdateSanguineVisual then
-        widgets.UpdateSanguineVisual(true)
-    end
-
     task.delay(0.35, function()
-        local w = getWidgets()
-        if w and w.UpdateSanguineVisual then
-            w.UpdateSanguineVisual(false)
-        end
         isCooldown = false
     end)
 end
 
-local boundSanguineKey = Enum.KeyCode.Z
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
-    if UserInputService:GetFocusedTextBox() then return end
-    if not (_G.DarlingX_SanguineBoost or _G.VinsersHub_SanguineBoost) then return end
-    if not isHoldingSanguine() then return end
-
-    local match = false
-    if typeof(boundSanguineKey) == "EnumItem" then
-        match = (input.KeyCode == boundSanguineKey)
-    elseif type(boundSanguineKey) == "string" then
-        match = (input.KeyCode.Name == boundSanguineKey)
-    end
-
-    if match then
-        triggerBoostWithVisual()
-    end
-end)
-
--- Auto-detect Sanguine Art Z move animation (14586872029) like Aurora X
-local function hookSanguineAnim(char)
-    if not char then return end
-    local hum = char:WaitForChild("Humanoid", 5)
-    if hum then
-        hum.AnimationPlayed:Connect(function(track)
-            if not (_G.DarlingX_SanguineBoost or _G.VinsersHub_SanguineBoost) then return end
-            local anim = track.Animation
-            local id = anim and tostring(anim.AnimationId) or ""
-            if id:find("14586872029") then
-                triggerBoostWithVisual()
-            end
-        end)
-    end
-end
-
-if player.Character then hookSanguineAnim(player.Character) end
-player.CharacterAdded:Connect(hookSanguineAnim)
-
 local SanguineModule = {
     DoBoost = doBoost,
-    Trigger = triggerBoostWithVisual,
+    Trigger = triggerBoost,
     SetKeybind = function(key)
-        if typeof(key) == "EnumItem" then
-            boundSanguineKey = key
-        elseif type(key) == "string" and Enum.KeyCode[key] then
-            boundSanguineKey = Enum.KeyCode[key]
-        else
-            boundSanguineKey = key
-        end
+        -- keybind is handled by main.lua KeyPicker, not internally
     end,
     SetEnabled = function(state)
-        _G.DarlingX_SanguineBoost = (state == true)
-        local widgets = getWidgets()
-        if widgets and widgets.SetSanguineWidgetVisible then
-            widgets.SetSanguineWidgetVisible(state == true)
-        end
+        sanguineEnabled = (state == true)
+        _G.DarlingX_SanguineBoost = sanguineEnabled
+        _G.VinsersHub_SanguineBoost = sanguineEnabled
     end,
     SetWidgetVisible = function(state)
-        local widgets = getWidgets()
-        if widgets and widgets.SetSanguineWidgetVisible then
-            widgets.SetSanguineWidgetVisible(state == true)
-        end
+        -- widget visibility handled elsewhere
     end,
 }
+
+_G.VinsersHub_SanguineBoostMod = SanguineModule
 
 return SanguineModule
