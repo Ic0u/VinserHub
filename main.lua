@@ -174,6 +174,8 @@ local M = {
     get = function(path) return RequireModule(path) end,
     getFastAttack = function() return RequireModule("modules/pvp/fast_attack.lua") end,
     getDragonGun = function() return RequireModule("modules/pvp/dragon_gun_m1.lua") end,
+    getGunAura = function() return RequireModule("modules/pvp/gun_aura.lua") end,
+    getAntiStun = function() return RequireModule("modules/pvp/anti_stun.lua") end,
     getSanguineBoost = function() return RequireModule("modules/pvp/sanguine_boost.lua") end,
     getGodhumanZ = function() return RequireModule("modules/pvp/godhuman_z_boost.lua") end,
     getExtraWidgets = function() return RequireModule("modules/pvp/extra_widgets.lua") end,
@@ -573,6 +575,38 @@ QuickBox:AddToggle("QuickGodhumanZ", {
         if gz then gz.SetEnabled(Value) end
         if Toggles.GodhumanZBoost and Toggles.GodhumanZBoost.Value ~= Value then
             Toggles.GodhumanZBoost:SetValue(Value)
+        end
+    end
+})
+
+QuickBox:AddToggle("QuickAntiStun", {
+    Text = "Anti Stun",
+    Default = false,
+    Tooltip = "Clears stun objects, unfreezes character, and cancels knockback",
+    Callback = function(Value)
+        local as = M.getAntiStun()
+        if as then
+            as.SetAntiStun(Value)
+            as.SetAntiKnockback(Value)
+        end
+        if Toggles.AntiStun and Toggles.AntiStun.Value ~= Value then
+            Toggles.AntiStun:SetValue(Value)
+        end
+        if Toggles.AntiKnockback and Toggles.AntiKnockback.Value ~= Value then
+            Toggles.AntiKnockback:SetValue(Value)
+        end
+    end
+})
+
+QuickBox:AddToggle("QuickSoulGuitarDash", {
+    Text = "Soul Guitar Dash Glitch",
+    Default = false,
+    Tooltip = "Sets DashLength to 121 studs for infinite distance dashes",
+    Callback = function(Value)
+        local mm = M.getMoveMod()
+        if mm and mm.SetSoulGuitarDash then mm.SetSoulGuitarDash(Value) end
+        if Toggles.SoulGuitarDash and Toggles.SoulGuitarDash.Value ~= Value then
+            Toggles.SoulGuitarDash:SetValue(Value)
         end
     end
 })
@@ -1010,6 +1044,108 @@ AutoCombatBox:AddToggle("AutoV4", {
     end
 })
 
+AutoCombatBox:AddToggle("AntiStun", {
+    Text = "Anti Stun",
+    Default = false,
+    Tooltip = "Instantly clears stun objects, attributes, and unfreezes character",
+    Callback = function(Value)
+        local as = M.getAntiStun()
+        if as then as.SetAntiStun(Value) end
+        if Toggles.QuickAntiStun and Toggles.QuickAntiStun.Value ~= Value then
+            Toggles.QuickAntiStun:SetValue(Value)
+        end
+        Library:Notify("Anti Stun: " .. (Value and "Enabled" or "Disabled"), 2)
+    end
+})
+
+AutoCombatBox:AddToggle("AntiKnockback", {
+    Text = "Anti Knockback",
+    Default = false,
+    Tooltip = "Cancels hostile BodyVelocity, LinearVelocity, and explosive knockback bursts",
+    Callback = function(Value)
+        local as = M.getAntiStun()
+        if as then as.SetAntiKnockback(Value) end
+        Library:Notify("Anti Knockback: " .. (Value and "Enabled" or "Disabled"), 2)
+    end
+})
+
+local GunAuraBox = Tabs.PvP:AddLeftGroupbox("M1 Gun Aura Engine")
+
+local GunAuraToggle = GunAuraBox:AddToggle("GunAuraEnabled", {
+    Text = "M1 Gun Aura",
+    Default = false,
+    Tooltip = "Rapid auto gunfire at nearest enemies / players (High speed zero lag)",
+    Callback = function(Value)
+        local ga = M.getGunAura()
+        if ga then ga.SetEnabled(Value) end
+        if Toggles.DragonGunM1 and Toggles.DragonGunM1.Value ~= Value then
+            Toggles.DragonGunM1:SetValue(Value)
+        end
+        Library:Notify("M1 Gun Aura: " .. (Value and "Enabled" or "Disabled"), 2)
+    end
+})
+
+GunAuraToggle:AddKeyPicker("GunAuraKeybind", {
+    Default = "G",
+    SyncToggleState = true,
+    Mode = "Toggle",
+    Text = "Gun Aura Keybind",
+    Callback = function()
+        local ga = M.getGunAura()
+        if ga then
+            ga.SetEnabled(not ga.Enabled)
+            Toggles.GunAuraEnabled:SetValue(ga.Enabled)
+        end
+    end
+})
+
+GunAuraBox:AddDropdown("GunAuraTarget", {
+    Values = { "Both", "Players", "Enemies" },
+    Default = 1,
+    Multi = false,
+    Text = "Target Selection",
+    Callback = function(Value)
+        local ga = M.getGunAura()
+        if ga then ga.SetTargetMode(Value) end
+    end
+})
+
+GunAuraBox:AddSlider("GunAuraRange", {
+    Text = "Max Range (Studs)",
+    Default = 350,
+    Min = 50,
+    Max = 500,
+    Rounding = 0,
+    Compact = false,
+    Callback = function(Value)
+        local ga = M.getGunAura()
+        if ga then ga.SetRange(Value) end
+    end
+})
+
+GunAuraBox:AddSlider("GunAuraShots", {
+    Text = "Shots Per Frame",
+    Default = 2,
+    Min = 1,
+    Max = 5,
+    Rounding = 0,
+    Compact = false,
+    Callback = function(Value)
+        local ga = M.getGunAura()
+        if ga then ga.SetShotsPerFrame(Value) end
+    end
+})
+
+GunAuraBox:AddToggle("GunAuraAutoEquip", {
+    Text = "Auto-Equip Gun",
+    Default = true,
+    Tooltip = "Automatically equips any gun from Backpack if not holding one",
+    Callback = function(Value)
+        local ga = M.getGunAura()
+        if ga then ga.SetAutoEquip(Value) end
+    end
+})
+
 AutoCombatBox:AddToggle("DragonGunM1", {
     Text = "Dragon Gun M1",
     Default = false,
@@ -1165,6 +1301,26 @@ CamlockTechBox:AddToggle("GodhumanZSwitchBack", {
     end
 })
 
+CamlockTechBox:AddToggle("GodhumanZAimlock", {
+    Text = "Godhuman Z Aimlock Snap",
+    Default = true,
+    Tooltip = "Snaps camera directly onto nearest enemy during Z launch and auto-releases on hit damage",
+    Callback = function(Value)
+        local gz = M.getGodhumanZ()
+        if gz and gz.SetAimlock then gz.SetAimlock(Value) end
+    end
+})
+
+CamlockTechBox:AddToggle("GodhumanZTargetInfo", {
+    Text = "Target Health HUD",
+    Default = false,
+    Tooltip = "Displays top-center target name and HP bar for the locked enemy",
+    Callback = function(Value)
+        local gz = M.getGodhumanZ()
+        if gz and gz.SetTargetInfo then gz.SetTargetInfo(Value) end
+    end
+})
+
 CamlockTechBox:AddSlider("GodhumanZPower", {
     Text = "Launch Power / Speed",
     Default = 650,
@@ -1259,6 +1415,20 @@ SpeedBox:AddSlider("DashDistance", {
     Callback = function(Value)
         local mm = M.getMoveMod()
         if mm then mm.SetDashDistance(Value) end
+    end
+})
+
+SpeedBox:AddToggle("SoulGuitarDash", {
+    Text = "Soul Guitar Dash Glitch",
+    Default = false,
+    Tooltip = "Bypasses dash physics and sets DashLength to 121 studs for infinite distance dashes",
+    Callback = function(Value)
+        local mm = M.getMoveMod()
+        if mm and mm.SetSoulGuitarDash then mm.SetSoulGuitarDash(Value) end
+        if Toggles.QuickSoulGuitarDash and Toggles.QuickSoulGuitarDash.Value ~= Value then
+            Toggles.QuickSoulGuitarDash:SetValue(Value)
+        end
+        Library:Notify("Soul Guitar Dash Glitch: " .. (Value and "Active" or "Inactive"), 2)
     end
 })
 
@@ -1661,6 +1831,18 @@ MacroCtrlBox:AddToggle("MacroLoop", {
     end
 })
 
+MacroCtrlBox:AddToggle("MacroAutoStartOnX", {
+    Text = "Auto Start on X",
+    Default = false,
+    Tooltip = "Runs the combo sequence right after you cast any X skill",
+    Callback = function(Value)
+        local mm = M.getMacro()
+        if mm and mm.setAutoStartOnX then
+            mm.setAutoStartOnX(Value)
+        end
+    end
+})
+
 MacroCtrlBox:AddToggle("MacroMobileButton", {
     Text = "Mobile Floating Button",
     Default = false,
@@ -1744,6 +1926,19 @@ for b = 1, 6 do
         Callback = function(Value)
             local mm = M.getMacro()
             if mm then mm.setSlot(b, nil, nil, nil, Value) end
+        end
+    })
+
+    parentTab:AddSlider("MacroB" .. b .. "_Hold", {
+        Text = string.format("Step %d Hold Duration (s)", b),
+        Default = 0.00,
+        Min = 0.00,
+        Max = 3.00,
+        Rounding = 2,
+        Compact = true,
+        Callback = function(Value)
+            local mm = M.getMacro()
+            if mm then mm.setSlot(b, nil, nil, nil, nil, Value) end
         end
     })
 
@@ -1965,6 +2160,8 @@ task.spawn(function()
     pcall(function()
         M.getFastAttack()
         M.getDragonGun()
+        M.getGunAura()
+        M.getAntiStun()
         M.getSanguineBoost()
         M.getGodhumanZ()
         M.getExtraWidgets()

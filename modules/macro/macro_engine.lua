@@ -570,6 +570,14 @@ function MacroEngine.ensureMobileButton(show)
     end
 end
 
+MacroEngine.AutoStartOnX = false
+
+function MacroEngine.setAutoStartOnX(state)
+    MacroEngine.AutoStartOnX = (state == true)
+    _G.VinsersHub_MacroAutoX = MacroEngine.AutoStartOnX
+    _G.DarlingX_MacroAutoX = MacroEngine.AutoStartOnX
+end
+
 -- Keyboard trigger listener
 UserInputService.InputBegan:Connect(function(inp, gpe)
     if gpe or inp.UserInputType ~= Enum.UserInputType.Keyboard then return end
@@ -580,6 +588,13 @@ UserInputService.InputBegan:Connect(function(inp, gpe)
         else
             MacroEngine.startMacro()
         end
+    elseif inp.KeyCode == Enum.KeyCode.X and MacroEngine.AutoStartOnX and MacroEngine.Enabled and not MacroEngine.Running then
+        task.spawn(function()
+            task.wait(0.2) -- allow initial X move startup
+            if MacroEngine.AutoStartOnX and MacroEngine.Enabled and not MacroEngine.Running then
+                MacroEngine.startMacro()
+            end
+        end)
     end
 end)
 

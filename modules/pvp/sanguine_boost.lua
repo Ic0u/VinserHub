@@ -27,18 +27,27 @@ local function doBoost()
     local dir = cam and cam.CFrame.LookVector or hrp.CFrame.LookVector
 
     local att = Instance.new("Attachment")
+    att.Name = "VinserSanguineAttachment"
+    att:SetAttribute("VinserPhysics", true)
     att.Parent = hrp
 
     local lv = Instance.new("LinearVelocity")
+    lv.Name = "VinserSanguineVelocity"
+    lv:SetAttribute("VinserPhysics", true)
     lv.MaxForce = math.huge
     lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
     lv.VectorVelocity = dir * velocityPower
     lv.Attachment0 = att
     lv.Parent = hrp
 
+    _G.Vinser_Boosting = true
+    _G.DarlingX_Boosting = true
+
     task.delay(boostDuration, function()
         if lv and lv.Parent then lv:Destroy() end
         if att and att.Parent then att:Destroy() end
+        _G.Vinser_Boosting = false
+        _G.DarlingX_Boosting = false
     end)
 end
 
@@ -81,10 +90,29 @@ end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.Z and _G.DarlingX_SanguineBoost then
+    if input.KeyCode == Enum.KeyCode.Z and (_G.DarlingX_SanguineBoost or _G.VinsersHub_SanguineBoost) then
         triggerBoostWithVisual()
     end
 end)
+
+-- Auto-detect Sanguine Art Z move animation (14586872029) like Aurora X
+local function hookSanguineAnim(char)
+    if not char then return end
+    local hum = char:WaitForChild("Humanoid", 5)
+    if hum then
+        hum.AnimationPlayed:Connect(function(track)
+            if not (_G.DarlingX_SanguineBoost or _G.VinsersHub_SanguineBoost) then return end
+            local anim = track.Animation
+            local id = anim and tostring(anim.AnimationId) or ""
+            if id:find("14586872029") then
+                triggerBoostWithVisual()
+            end
+        end)
+    end
+end
+
+if player.Character then hookSanguineAnim(player.Character) end
+player.CharacterAdded:Connect(hookSanguineAnim)
 
 local SanguineModule = {
     DoBoost = doBoost,

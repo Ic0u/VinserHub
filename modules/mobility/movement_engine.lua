@@ -19,6 +19,7 @@ local MovementEngine = {
 
     DashLengthEnabled = false,
     DashLengthValue = 30,
+    SoulGuitarDashEnabled = false,
 
     SuperJumpEnabled = false,
     SuperJumpPower = 216,
@@ -162,6 +163,18 @@ end
 function MovementEngine.SetDashDistance(val)
     MovementEngine.DashLengthValue = tonumber(val) or 30
     _G.DarlingX_DashLength = MovementEngine.DashLengthValue
+end
+
+function MovementEngine.SetSoulGuitarDash(enabled)
+    MovementEngine.SoulGuitarDashEnabled = (enabled == true)
+    _G.VinsersHub_SoulGuitarDash = MovementEngine.SoulGuitarDashEnabled
+    _G.DarlingX_SoulGuitarDash = MovementEngine.SoulGuitarDashEnabled
+
+    if MovementEngine.SoulGuitarDashEnabled then
+        MovementEngine.SetDashLength(true, 121)
+    else
+        MovementEngine.SetDashLength(false, 1)
+    end
 end
 
 -- ========================================================================
