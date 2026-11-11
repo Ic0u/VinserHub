@@ -175,6 +175,7 @@ local M = {
     getFastAttack = function() return RequireModule("modules/pvp/fast_attack.lua") end,
     getDragonGun = function() return RequireModule("modules/pvp/dragon_gun_m1.lua") end,
     getSanguineBoost = function() return RequireModule("modules/pvp/sanguine_boost.lua") end,
+    getGodhumanZ = function() return RequireModule("modules/pvp/godhuman_z_boost.lua") end,
     getExtraWidgets = function() return RequireModule("modules/pvp/extra_widgets.lua") end,
     getAutoCombat = function() return RequireModule("modules/pvp/auto_combat.lua") end,
     getCamlock = function() return RequireModule("modules/pvp/camlock.lua") end,
@@ -559,6 +560,19 @@ QuickBox:AddToggle("QuickSanguineBoost", {
         if ew then ew.SetSanguineWidgetVisible(Value) end
         if Toggles.SanguineBoost and Toggles.SanguineBoost.Value ~= Value then
             Toggles.SanguineBoost:SetValue(Value)
+        end
+    end
+})
+
+QuickBox:AddToggle("QuickGodhumanZ", {
+    Text = "Godhuman Z Glitch",
+    Default = false,
+    Tooltip = "Godhuman Z momentum launch & swap-cancel glitch",
+    Callback = function(Value)
+        local gz = M.getGodhumanZ()
+        if gz then gz.SetEnabled(Value) end
+        if Toggles.GodhumanZBoost and Toggles.GodhumanZBoost.Value ~= Value then
+            Toggles.GodhumanZBoost:SetValue(Value)
         end
     end
 })
@@ -1089,6 +1103,97 @@ CamlockTechBox:AddButton({
     Func = function()
         local sb = M.getSanguineBoost()
         if sb and sb.Trigger then sb.Trigger() end
+    end
+})
+
+CamlockTechBox:AddDivider()
+
+local GodhumanZToggle = CamlockTechBox:AddToggle("GodhumanZBoost", {
+    Text = "Godhuman Z Glitch / Boost",
+    Default = false,
+    Tooltip = "Automates Godhuman Z Soaring Beast momentum launch & swap-cancel glitch",
+    Callback = function(Value)
+        local gz = M.getGodhumanZ()
+        if gz then gz.SetEnabled(Value) end
+        if Toggles.QuickGodhumanZ and Toggles.QuickGodhumanZ.Value ~= Value then
+            Toggles.QuickGodhumanZ:SetValue(Value)
+        end
+        Library:Notify("Godhuman Z Glitch: " .. (Value and "Active" or "Inactive"), 2)
+    end
+})
+
+GodhumanZToggle:AddKeyPicker("GodhumanZKeybind", {
+    Default = "Z",
+    SyncToggleState = false,
+    Mode = "Press",
+    Text = "Godhuman Z Keybind",
+    Callback = function()
+        local gz = M.getGodhumanZ()
+        if gz and gz.Enabled then gz.Trigger() end
+    end
+})
+
+CamlockTechBox:AddDropdown("GodhumanZCancel", {
+    Values = { "Auto", "Fruit", "Sword", "Gun", "Slot 2" },
+    Default = 1,
+    Multi = false,
+    Text = "Swap Cancel Weapon",
+    Tooltip = "Switches to this tool to cancel move end-lag and activate flight",
+    Callback = function(Value)
+        local gz = M.getGodhumanZ()
+        if gz then gz.SetCancelWeapon(Value) end
+    end
+})
+
+CamlockTechBox:AddToggle("GodhumanZSkyPitch", {
+    Text = "Auto Sky Arc (+35° Pitch)",
+    Default = true,
+    Tooltip = "Elevates trajectory upward to glide cleanly across ocean waters",
+    Callback = function(Value)
+        local gz = M.getGodhumanZ()
+        if gz then gz.SetAutoPitch(Value) end
+    end
+})
+
+CamlockTechBox:AddToggle("GodhumanZSwitchBack", {
+    Text = "Re-Equip Godhuman Upon Landing",
+    Default = false,
+    Tooltip = "Automatically switches back to Godhuman after the glide ends",
+    Callback = function(Value)
+        local gz = M.getGodhumanZ()
+        if gz then gz.SetSwitchBack(Value) end
+    end
+})
+
+CamlockTechBox:AddSlider("GodhumanZPower", {
+    Text = "Launch Power / Speed",
+    Default = 650,
+    Min = 200,
+    Max = 1500,
+    Rounding = 25,
+    Callback = function(Value)
+        local gz = M.getGodhumanZ()
+        if gz then gz.SetPower(Value) end
+    end
+})
+
+CamlockTechBox:AddSlider("GodhumanZDuration", {
+    Text = "Glide Duration (s)",
+    Default = 1.2,
+    Min = 0.3,
+    Max = 3.0,
+    Rounding = 0.1,
+    Callback = function(Value)
+        local gz = M.getGodhumanZ()
+        if gz then gz.SetDuration(Value) end
+    end
+})
+
+CamlockTechBox:AddButton({
+    Text = "Trigger Godhuman Z Bug (Launch)",
+    Func = function()
+        local gz = M.getGodhumanZ()
+        if gz then gz.Trigger() end
     end
 })
 
@@ -1861,6 +1966,7 @@ task.spawn(function()
         M.getFastAttack()
         M.getDragonGun()
         M.getSanguineBoost()
+        M.getGodhumanZ()
         M.getExtraWidgets()
         M.getAutoCombat()
         M.getCamlock()
