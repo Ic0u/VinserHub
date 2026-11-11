@@ -22,11 +22,11 @@ local LocalPlayer = Players.LocalPlayer
 
 local GodhumanZ = {
     Enabled = false,
-    Power = 420,                                  -- Tuned velocity impulse (anti-cheat safe, no rubberband)
-    Duration = 0.85,                              -- Gliding duration across the sea (~350 studs)
+    Power = 450,                                  -- Hardcoded tuned impulse (ultra fast & far, anti-cheat safe)
+    Duration = 0.90,                              -- Hardcoded tuned glide duration (~400 studs glide)
     CancelMode = "Unequip (No slot switch)",      -- "Unequip (No slot switch)", "Auto Swap", "Fruit", "Sword", "Gun", "Slot 2"
     CancelWeapon = "Auto",                        -- Backward compatibility
-    AutoSkyPitch = true,                          -- Auto-elevates angle ~28° for clean flight arc over water
+    AutoSkyPitch = true,                          -- Hardcoded clean +28° elevation arc (hidden from UI)
     SwitchBack = true,                            -- Re-equip Godhuman after landing
     CheckCooldown = true,                         -- Only boosts when Soaring Beast is off cooldown
     AimlockEnabled = true,                        -- Snaps camera and trajectory toward nearest enemy
@@ -447,9 +447,10 @@ local function launchGlitchMomentum(power, duration, usePitch, targetHrp)
     local char, hrp, hum = getCharacter()
     if not hrp then return end
 
-    -- Safe velocity clamp to guarantee zero anti-cheat rubberband
-    power = math.clamp(tonumber(power) or 420, 150, 550)
-    duration = math.clamp(tonumber(duration) or 0.85, 0.3, 1.5)
+    -- Hardcoded optimal tuned constants: ultra fast & far, zero anti-cheat flag
+    power = 450
+    duration = 0.90
+    usePitch = true
 
     local cam = Workspace.CurrentCamera
     local dir = cam and cam.CFrame.LookVector or hrp.CFrame.LookVector

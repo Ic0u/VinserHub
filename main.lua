@@ -1311,16 +1311,6 @@ CamlockTechBox:AddToggle("GodhumanZCheckCD", {
     end
 })
 
-CamlockTechBox:AddToggle("GodhumanZSkyPitch", {
-    Text = "Auto Sky Arc (+28° Pitch)",
-    Default = true,
-    Tooltip = "Elevates trajectory upward to glide cleanly across ocean waters",
-    Callback = function(Value)
-        local gz = M.getGodhumanZ()
-        if gz then gz.SetAutoPitch(Value) end
-    end
-})
-
 CamlockTechBox:AddToggle("GodhumanZSwitchBack", {
     Text = "Re-Equip Godhuman Upon Landing",
     Default = true,
@@ -1348,31 +1338,6 @@ CamlockTechBox:AddToggle("GodhumanZTargetInfo", {
     Callback = function(Value)
         local gz = M.getGodhumanZ()
         if gz and gz.SetTargetInfo then gz.SetTargetInfo(Value) end
-    end
-})
-
-CamlockTechBox:AddSlider("GodhumanZPower", {
-    Text = "Launch Power / Speed",
-    Default = 420,
-    Min = 200,
-    Max = 550,
-    Rounding = 10,
-    Tooltip = "Tuned to ~420 studs/s for maximum distance without anti-cheat rubberbanding",
-    Callback = function(Value)
-        local gz = M.getGodhumanZ()
-        if gz then gz.SetPower(Value) end
-    end
-})
-
-CamlockTechBox:AddSlider("GodhumanZDuration", {
-    Text = "Glide Duration (s)",
-    Default = 0.85,
-    Min = 0.3,
-    Max = 1.5,
-    Rounding = 0.05,
-    Callback = function(Value)
-        local gz = M.getGodhumanZ()
-        if gz then gz.SetDuration(Value) end
     end
 })
 
