@@ -567,9 +567,9 @@ QuickBox:AddToggle("QuickSanguineBoost", {
 })
 
 QuickBox:AddToggle("QuickGodhumanZ", {
-    Text = "Godhuman Z Glitch",
+    Text = "Godhuman Z Boost",
     Default = false,
-    Tooltip = "Godhuman Z momentum launch & swap-cancel glitch",
+    Tooltip = "Godhuman Z momentum launch, swap-cancel, and aimlock",
     Callback = function(Value)
         local gz = M.getGodhumanZ()
         if gz then gz.SetEnabled(Value) end
@@ -1226,11 +1226,17 @@ local SanguineToggle = CamlockTechBox:AddToggle("SanguineBoost", {
 SanguineToggle:AddKeyPicker("SanguineKeybind", {
     Default = "Z",
     SyncToggleState = false,
-    Mode = "Press",
+    Mode = "Toggle",
     Text = "Sanguine Keybind",
     Callback = function()
         local sb = M.getSanguineBoost()
         if sb and sb.Trigger then sb.Trigger() end
+    end,
+    ChangedCallback = function(NewKey)
+        local sb = M.getSanguineBoost()
+        if sb and sb.SetKeybind then
+            sb.SetKeybind(NewKey)
+        end
     end
 })
 
@@ -1245,27 +1251,33 @@ CamlockTechBox:AddButton({
 CamlockTechBox:AddDivider()
 
 local GodhumanZToggle = CamlockTechBox:AddToggle("GodhumanZBoost", {
-    Text = "Godhuman Z Glitch / Boost",
+    Text = "Godhuman Z Boost",
     Default = false,
-    Tooltip = "Automates Godhuman Z Soaring Beast momentum launch & swap-cancel glitch",
+    Tooltip = "Automates Godhuman Z Soaring Beast momentum launch, swap-cancel, and aimlock",
     Callback = function(Value)
         local gz = M.getGodhumanZ()
         if gz then gz.SetEnabled(Value) end
         if Toggles.QuickGodhumanZ and Toggles.QuickGodhumanZ.Value ~= Value then
             Toggles.QuickGodhumanZ:SetValue(Value)
         end
-        Library:Notify("Godhuman Z Glitch: " .. (Value and "Active" or "Inactive"), 2)
+        Library:Notify("Godhuman Z Boost: " .. (Value and "Active" or "Inactive"), 2)
     end
 })
 
 GodhumanZToggle:AddKeyPicker("GodhumanZKeybind", {
-    Default = "Z",
+    Default = "E",
     SyncToggleState = false,
-    Mode = "Press",
-    Text = "Godhuman Z Keybind",
+    Mode = "Toggle",
+    Text = "Godhuman Z Boost Keybind",
     Callback = function()
         local gz = M.getGodhumanZ()
         if gz and gz.Enabled then gz.Trigger() end
+    end,
+    ChangedCallback = function(NewKey)
+        local gz = M.getGodhumanZ()
+        if gz and gz.SetKeybind then
+            gz.SetKeybind(NewKey)
+        end
     end
 })
 
@@ -1346,7 +1358,7 @@ CamlockTechBox:AddSlider("GodhumanZDuration", {
 })
 
 CamlockTechBox:AddButton({
-    Text = "Trigger Godhuman Z Bug (Launch)",
+    Text = "Trigger Godhuman Z Boost",
     Func = function()
         local gz = M.getGodhumanZ()
         if gz then gz.Trigger() end
@@ -1791,7 +1803,7 @@ local MacroToggle = MacroCtrlBox:AddToggle("MacroEnabled", {
 MacroToggle:AddKeyPicker("MacroTriggerKey", {
     Default = "F",
     SyncToggleState = false,
-    Mode = "Press",
+    Mode = "Toggle",
     Text = "Macro Trigger Keybind",
     Callback = function()
         local mm = M.getMacro()
@@ -1802,6 +1814,12 @@ MacroToggle:AddKeyPicker("MacroTriggerKey", {
                 mm.Enabled = true
                 mm.startMacro()
             end
+        end
+    end,
+    ChangedCallback = function(NewKey)
+        local mm = M.getMacro()
+        if mm and Enum.KeyCode[NewKey] then
+            mm.TriggerKey = Enum.KeyCode[NewKey]
         end
     end
 })
@@ -2173,6 +2191,36 @@ task.spawn(function()
         M.getMacro()
         M.getClientTweaks()
     end)
+end)
+
+-- Master Global Input Dispatcher (Bypasses UI library nuances and ContextActionService locks)
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+    if UserInputService:GetFocusedTextBox() then return end
+
+    local keyName = input.KeyCode.Name
+
+    -- 1. Godhuman Z Boost Keybind
+    if Toggles.GodhumanZBoost and Toggles.GodhumanZBoost.Value and Options.GodhumanZKeybind then
+        local bound = Options.GodhumanZKeybind.Value
+        if bound and bound ~= "None" and keyName == bound then
+            local gz = M.getGodhumanZ()
+            if gz and gz.Trigger then
+                gz.Trigger()
+            end
+        end
+    end
+
+    -- 2. Sanguine Boost Keybind
+    if Toggles.SanguineBoost and Toggles.SanguineBoost.Value and Options.SanguineKeybind then
+        local bound = Options.SanguineKeybind.Value
+        if bound and bound ~= "None" and keyName == bound then
+            local sb = M.getSanguineBoost()
+            if sb and sb.Trigger then
+                sb.Trigger()
+            end
+        end
+    end
 end)
 
 -- Load auto-saved config profile if exists

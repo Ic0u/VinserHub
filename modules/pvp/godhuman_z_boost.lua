@@ -563,16 +563,31 @@ end
 function GodhumanZ.SetKeybind(key)
     if typeof(key) == "EnumItem" then
         GodhumanZ.Keybind = key
-    elseif type(key) == "string" and Enum.KeyCode[key] then
-        GodhumanZ.Keybind = Enum.KeyCode[key]
+    elseif type(key) == "string" then
+        if Enum.KeyCode[key] then
+            GodhumanZ.Keybind = Enum.KeyCode[key]
+        else
+            GodhumanZ.Keybind = key
+        end
     end
 end
 
--- Keybind listener
+-- Direct Keybind listener (Ignores gameProcessed so keys like E, R, Q work reliably in Blox Fruits)
 UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
+    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+    if UserInputService:GetFocusedTextBox() then return end
     if not GodhumanZ.Enabled then return end
-    if input.KeyCode == GodhumanZ.Keybind then
+
+    local targetKey = GodhumanZ.Keybind
+    local match = false
+
+    if typeof(targetKey) == "EnumItem" then
+        match = (input.KeyCode == targetKey)
+    elseif type(targetKey) == "string" then
+        match = (input.KeyCode.Name == targetKey)
+    end
+
+    if match then
         GodhumanZ.Trigger()
     end
 end)

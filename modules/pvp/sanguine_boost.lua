@@ -88,9 +88,21 @@ local function triggerBoostWithVisual()
     end)
 end
 
+local boundSanguineKey = Enum.KeyCode.Z
+
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.Z and (_G.DarlingX_SanguineBoost or _G.VinsersHub_SanguineBoost) then
+    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+    if UserInputService:GetFocusedTextBox() then return end
+    if not (_G.DarlingX_SanguineBoost or _G.VinsersHub_SanguineBoost) then return end
+
+    local match = false
+    if typeof(boundSanguineKey) == "EnumItem" then
+        match = (input.KeyCode == boundSanguineKey)
+    elseif type(boundSanguineKey) == "string" then
+        match = (input.KeyCode.Name == boundSanguineKey)
+    end
+
+    if match then
         triggerBoostWithVisual()
     end
 end)
@@ -117,6 +129,15 @@ player.CharacterAdded:Connect(hookSanguineAnim)
 local SanguineModule = {
     DoBoost = doBoost,
     Trigger = triggerBoostWithVisual,
+    SetKeybind = function(key)
+        if typeof(key) == "EnumItem" then
+            boundSanguineKey = key
+        elseif type(key) == "string" and Enum.KeyCode[key] then
+            boundSanguineKey = Enum.KeyCode[key]
+        else
+            boundSanguineKey = key
+        end
+    end,
     SetEnabled = function(state)
         _G.DarlingX_SanguineBoost = (state == true)
         local widgets = getWidgets()
